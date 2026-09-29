@@ -1,53 +1,41 @@
-# Workflow GitHub Actions : construit le site (dashboard + données) et le publie sur GitHub Pages.
-# GitHub exécute ce fichier automatiquement ; il faut juste avoir choisi
-# Settings → Pages → Source : « GitHub Actions » (fait une fois pour toutes).
-# Résultat : https://<utilisateur>.github.io/<dépôt>/
+# À chaque push sur main : assemble le site (dashboard + données) et le publie sur GitHub Pages.
+# Résultat : https://ndelucin.github.io/rowerboard/
 name: Deploy dashboard
 
-# --- Déclencheurs : quand ce workflow démarre ---
+# QUAND : à chaque push sur main, ou à la main depuis l'onglet Actions.
 on:
-  # À chaque push sur la branche main (donc après chaque `git push` de nouvelles données).
   push:
     branches: [main]
-  # Permet aussi de le lancer à la main (onglet Actions → « Run workflow » ou `gh workflow run`).
   workflow_dispatch:
 
-# --- Permissions accordées au jeton temporaire de l'exécution (principe du moindre privilège) ---
+# DROITS : ce que le workflow a le droit de faire.
 permissions:
-  contents: read    # lire le code du dépôt (checkout)
+  contents: read    # lire le code du dépôt
   pages: write      # publier sur GitHub Pages
-  id-token: write   # prouver à Pages que le déploiement vient bien de ce workflow (OIDC)
-
-# Un seul déploiement à la fois : si deux push arrivent coup sur coup,
-# l'ancien est annulé au profit du plus récent.
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  id-token: write   # prouver à Pages que le déploiement vient bien de ce workflow
 
 jobs:
   deploy:
-    # Machine virtuelle temporaire, créée pour l'occasion puis détruite à la fin.
-    runs-on: ubuntu-latest
-    # Environnement « github-pages » : GitHub y affiche l'historique des déploiements
-    # et l'URL du site publié (récupérée à la dernière étape).
+    runs-on: ubuntu-latest   # une machine temporaire, détruite à la fin
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      # 1. Télécharge le code du dépôt sur la machine (dashboard/, data/, scripts/...).
-      #    Le dossier input/ n'y est pas : il est gitignoré et reste sur ton Mac.
+      # 1. Récupère le code du dépôt sur la machine.
       - uses: actions/checkout@v4
 
-      # 2. Assemble le site : copie dashboard/ et data/ dans _site/.
-      #    Aucune compilation : ce ne sont que des fichiers statiques.
-      - run: python3 scripts/build_site.py
+      # 2. Construit le site : un dossier _site/ qui contient le dashboard
+      #    et, dedans, le dossier data/. C'est la seule étape "à nous".
+      - run: |
+          mkdir _site
+          cp -r dashboard/. _site/
+          cp -r data _site/data
 
-      # 3. Empaquette _site/ dans une archive au format attendu par GitHub Pages.
+      # 3. Emballe _site/ dans une archive.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
-      # 4. Envoie l'archive à GitHub Pages, qui la met en ligne (~ quelques secondes).
-      #    `id: deploy` sert à lire l'URL du site dans `environment.url` ci-dessus.
+      # 4. Demande à GitHub Pages de publier cette archive.
       - id: deploy
         uses: actions/deploy-pages@v4

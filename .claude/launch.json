@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dashboard", "runtimeExecutable": "python3", "runtimeArgs": ["scripts/build_site.py", "--serve", "8000"], "port": 8000 }
+    { "name": "dashboard", "runtimeExecutable": "bash", "runtimeArgs": ["-c", "rm -rf _site && mkdir _site && cp -r dashboard/. _site/ && cp -r data _site/data && cd _site && python3 -m http.server 8000"], "port": 8000 }
   ]
 }
