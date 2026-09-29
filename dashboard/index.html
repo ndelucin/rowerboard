@@ -4,12 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rowerboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@1,600&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <div class="wrap top-in">
-    <h1>Rowerboard</h1>
+    <h1>RowerBoard</h1>
     <span class="sub" id="subtitle"></span>
     <button id="themeBtn" class="ghost" aria-label="Changer de thème">◐</button>
   </div>
@@ -19,28 +22,34 @@
 
   <section id="kpis" class="kpis"></section>
 
-  <section class="card">
-    <h2>Progression</h2>
+  <details class="card fold" open>
+    <summary><h2>Suivi de Progression</h2></summary>
     <div class="grid2">
-      <figure><figcaption>Allure moyenne /500 m</figcaption><div class="chart"><canvas id="cPace"></canvas></div></figure>
+      <figure><figcaption>Allure moyenne /2000 m</figcaption><div class="chart"><canvas id="cPace"></canvas></div></figure>
       <figure><figcaption>Puissance moyenne (W)</figcaption><div class="chart"><canvas id="cWatts"></canvas></div></figure>
       <figure><figcaption>FC moyenne (bpm)</figcaption><div class="chart"><canvas id="cHr"></canvas></div></figure>
-      <figure><figcaption>Efficacité (W / bpm)</figcaption><div class="chart"><canvas id="cEff"></canvas></div></figure>
+      <figure><figcaption>Efficience (W / bpm)</figcaption><div class="chart"><canvas id="cEff"></canvas></div></figure>
     </div>
-  </section>
+  </details>
 
-  <section class="card">
-    <h2>Historique</h2>
+  <details class="card fold" open>
+    <summary><h2>Historique des séances</h2></summary>
     <div class="table-scroll"><table id="history"></table></div>
-  </section>
+  </details>
 
   <section class="card" id="detail" hidden>
-    <h2 id="detailTitle"></h2>
+    <div class="detail-head">
+      <h2 id="detailTitle"></h2>
+      <div class="detail-nav">
+        <button id="prevBtn" class="ghost" aria-label="Séance au-dessus" title="Séance au-dessus">↑</button>
+        <button id="nextBtn" class="ghost" aria-label="Séance en dessous" title="Séance en dessous">↓</button>
+      </div>
+    </div>
     <div id="detailWarn" class="msg warn" hidden>Le fichier Polar recouvre moins de la moitié de la séance : la FC est partielle.</div>
     <div id="detailStats" class="stats"></div>
     <figure><figcaption>Puissance et fréquence cardiaque</figcaption><div class="chart tall"><canvas id="dWattsHr"></canvas></div></figure>
     <div class="grid2">
-      <figure><figcaption>Allure /500 m (fenêtre glissante)</figcaption><div class="chart"><canvas id="dPace"></canvas></div></figure>
+      <figure><figcaption>Allure /2000 m (fenêtre glissante)</figcaption><div class="chart"><canvas id="dPace"></canvas></div></figure>
       <figure><figcaption>Cadence (coups/min)</figcaption><div class="chart"><canvas id="dCad"></canvas></div></figure>
     </div>
     <figure><figcaption>Temps passé par zone de FC</figcaption><div id="zones" class="zones"></div></figure>

@@ -1,4 +1,4 @@
-import { pace, dur } from './format.js';
+import { pace, to2000, dur } from './format.js';
 
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const charts = {};
@@ -23,25 +23,26 @@ const line = (label, data, color, extra = {}) => ({ label, data, borderColor: co
 export function progression(sessions) {
   const labels = sessions.map(s => new Date(s.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }));
   const one = (id, key, color, opts = {}) => make(id, {
+    // `get` extrait la valeur tracée (par défaut la clé du résumé de séance)
     type: 'line',
-    data: { labels, datasets: [line(key, sessions.map(s => s[key]), color, { pointRadius: 4, pointHoverRadius: 6 })] },
+    data: { labels, datasets: [line(key, sessions.map(opts.get || (s => s[key])), color, { pointRadius: 4, pointHoverRadius: 6 })] },
     options: { scales: { x: {}, y: { reverse: !!opts.reverse, ticks: { callback: opts.fmt } } },
       plugins: { tooltip: { callbacks: { label: c => (opts.fmt ? opts.fmt(c.parsed.y) : c.parsed.y) } } } },
   });
-  one('cPace', 'avgPace500', css('--c1'), { reverse: true, fmt: pace });
+  one('cPace', 'avgPace500', css('--c1'), { reverse: true, fmt: pace, get: s => to2000(s.avgPace500) });
   one('cWatts', 'avgWatts', css('--c3'));
   one('cHr', 'avgHr', css('--c2'));
   one('cEff', 'efficiency', css('--c4'), { fmt: v => v.toFixed(2) });
 }
 
-// Allure /500 m sur une fenêtre glissante de ~30 s
+// Allure /2000 m sur une fenêtre glissante de ~30 s
 function rollingPace(series, windowS = 30) {
   return series.map((p, i) => {
     let j = i;
     while (j > 0 && p.t - series[j].t < windowS) j--;
     const dd = p.distance - series[j].distance, dt = p.t - series[j].t;
     const v = dd > 0 && dt > 0 ? 500 * dt / dd : null;
-    return v && v >= 60 && v <= 300 ? v : null; // écarte les pauses / arrêts
+    return v && v >= 60 && v <= 300 ? to2000(v) : null; // (filtre sur l'allure /500 m) écarte les pauses / arrêts
   });
 }
 
@@ -67,7 +68,7 @@ export function detail(session) {
     type: 'line',
     data: { labels: t, datasets: [line('Allure', rollingPace(s), css('--c3'))] },
     options: { scales: { x: { ticks: xTicks }, y: { reverse: true, ticks: { callback: pace } } },
-      plugins: { tooltip: { callbacks: { title: it => dur(t[it[0].dataIndex]), label: c => pace(c.parsed.y) + ' /500 m' } } } },
+      plugins: { tooltip: { callbacks: { title: it => dur(t[it[0].dataIndex]), label: c => pace(c.parsed.y) + ' /2000 m' } } } },
   });
   make('dCad', {
     type: 'line',
