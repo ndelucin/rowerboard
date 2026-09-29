@@ -13,7 +13,7 @@ needs_input = pytest.mark.skipif(not S4.exists(), reason="input/ absent")
 
 
 @needs_input
-def test_session_1509_matches_prototype_seed():
+def test_session_1509_reference_values():
     s = m.compute_session(
         m.parse_s4(S4 / "2026-09-15_1807_workout.tcx"),
         m.parse_polar(POLAR / "Nicolas_Delucinge_2026-09-15_20-08-32.TCX"), 180)
