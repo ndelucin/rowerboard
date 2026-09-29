@@ -40,6 +40,7 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 | Chemin | Rôle |
 |---|---|
 | `scripts/merge_tcx.py` | Script de fusion (Python 3.9+, bibliothèque standard) |
+| `scripts/sync.py` | Ramasse les TCX exportés, fusionne, teste, commite et pousse (commande unique après une séance) |
 | `scripts/tests/` | Tests `pytest` |
 | `data/` | JSON générés, publiés sur GitHub |
 | `dashboard/` | Site statique : `index.html`, `style.css`, `js/`, `vendor/` (Chart.js), `fonts/` |
@@ -61,7 +62,29 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 
 #### Ajouter une séance
 
-Dépose les deux exports dans `input/data/s4/` et `input/data/polar/`, puis :
+**En trois gestes.** Exporte le TCX de la séance sur [waterrowernohrdaccount.com](https://waterrowernohrdaccount.com/dashboard) et sur [Polar Flow](https://flow.polar.com/diary) (ils arrivent dans `~/Downloads`), puis :
+
+```bash
+python3 scripts/sync.py
+```
+
+`sync.py` enchaîne tout le reste :
+1. ramasse les `.tcx` des dernières 24 h dans `~/Downloads`, les reconnaît par leur contenu (Watts = WaterRower, FC seule = Polar) et les range dans `input/data/s4/` ou `input/data/polar/` ;
+2. lance la fusion ;
+3. s'il y a une nouvelle séance : lance les tests, commite `data/` (« Nouvelle séance AAAA-MM-JJ ») et pousse.
+
+Garde-fous : rien n'est poussé si `data/` n'a pas changé, si les tests échouent, ou si l'arbre git contient d'autres modifications (dans ce cas la commande s'arrête avant de toucher aux fichiers). Si un seul des deux exports est présent, elle le signale et attend l'autre.
+
+| Option | Effet |
+|---|---|
+| `--dry-run` | montre ce qui serait ramassé, sans rien déplacer ni pousser |
+| `--no-push` | commit local, sans `git push` |
+| `--since N` | prend les fichiers des N dernières heures (défaut 24) |
+| `--downloads DIR` | autre dossier que `~/Downloads` |
+
+#### Ajouter une séance à la main
+
+Sans `sync.py` : dépose les deux exports dans `input/data/s4/` et `input/data/polar/`, puis :
 
 ```bash
 python3 scripts/merge_tcx.py --auto
