@@ -1,6 +1,6 @@
 # À chaque push sur main : assemble le site (dashboard + données) et le publie sur GitHub Pages.
 # Résultat : https://ndelucin.github.io/rowerboard/
-name: Deploy dashboard
+name: Deploy on GH Pages
 
 # QUAND : à chaque push sur main, ou à la main depuis l'onglet Actions.
 on:

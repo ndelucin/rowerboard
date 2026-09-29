@@ -45,7 +45,7 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 | `data/` | JSON générés, publiés sur GitHub |
 | `dashboard/` | Site statique : `index.html`, `style.css`, `js/`, `vendor/` (Chart.js), `fonts/` |
 | `docs/schema.md` | Format précis des JSON |
-| `.github/workflows/pages.yml` | Déploiement automatique sur Pages |
+| `.github/workflows/deploy-on-gh-pages.yml` | Déploiement automatique sur Pages |
 | `input/` | Exports TCX bruts. **Gitignoré, reste sur ta machine** |
 
 ### Objets principaux
@@ -56,7 +56,7 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 | **Catalogue** | `data/index.json` : la liste légère des séances (date, fichier, chiffres de synthèse), sans les séries |
 | **Script de fusion** | `merge_tcx.py` : lit les TCX, produit le fichier séance correspondant et met à jour le catalogue |
 | **Dashboard** | Le site : KPI, suivi de progression, historique, détail d'une séance |
-| **Workflow Pages** | `pages.yml` : assemble et publie le site à chaque push sur `main` |
+| **Workflow Pages** | `deploy-on-gh-pages.yml` : assemble et publie le site à chaque push sur `main` |
 
 ### Utilisation
 
@@ -228,7 +228,7 @@ sequenceDiagram
     participant Pages as GitHub Pages
 
     Mac->>Repo: git push
-    Repo->>Run: push sur main : GitHub lit pages.yml et lance le job
+    Repo->>Run: push sur main : GitHub lit deploy-on-gh-pages.yml et lance le job
     Note over Run: uses: actions/checkout@v4
     Run->>Repo: télécharge le code
     Note over Run: run: mkdir _site && cp -r ...<br/>(le seul code « à nous »)
@@ -247,7 +247,7 @@ sequenceDiagram
 | `actions/deploy-pages@v4` | action GitHub | Demande à Pages de publier l'archive |
 
 - `uses:` appelle une action réutilisable écrite par GitHub ; `run:` exécute une commande shell.
-- `_site` est un simple nom de dossier, pas un mot-clé. Il figure dans `pages.yml` (`path: _site`) et dans `.gitignore`.
+- `_site` est un simple nom de dossier, pas un mot-clé. Il figure dans `deploy-on-gh-pages.yml` (`path: _site`) et dans `.gitignore`.
 - Après un push, le site est à jour en une trentaine de secondes. Onglet **Actions** : historique des runs, statut, logs.
 - On ne voit pas `_site/` dans le dépôt : il n'existe que le temps du run. Une copie du dernier déploiement est téléchargeable dans l'onglet Actions (section « Artifacts », expire après un jour).
 
