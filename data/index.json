@@ -1,0 +1,80 @@
+{
+ "version": 1,
+ "sessions": [
+  {
+   "id": "2026-09-15T18:07:17Z",
+   "date": "2026-09-15T18:07:17Z",
+   "file": "sessions/2026-09-15T180717Z.json",
+   "fcmaxAtSave": 180,
+   "overlapWarning": false,
+   "duration": 1072.275,
+   "distance": 4025.0,
+   "calories": 206.0,
+   "caloriesPolar": 206.0,
+   "avgWatts": 115.86,
+   "maxWatts": 153.0,
+   "avgCadence": 16.93,
+   "avgHr": 124.37,
+   "maxHr": 143.0,
+   "avgPace500": 133.2,
+   "efficiency": 0.9316,
+   "zonePct": [
+    11,
+    41,
+    48,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "2026-09-18T16:11:32Z",
+   "date": "2026-09-18T16:11:32Z",
+   "file": "sessions/2026-09-18T161132Z.json",
+   "fcmaxAtSave": 180,
+   "overlapWarning": false,
+   "duration": 1208.754,
+   "distance": 4610.0,
+   "calories": 236.0,
+   "caloriesPolar": 233.0,
+   "avgWatts": 117.75,
+   "maxWatts": 155.0,
+   "avgCadence": 17.8,
+   "avgHr": 137.39,
+   "maxHr": 156.0,
+   "avgPace500": 131.1,
+   "efficiency": 0.8571,
+   "zonePct": [
+    5,
+    8,
+    41,
+    45,
+    0
+   ]
+  },
+  {
+   "id": "2026-09-23T16:52:10Z",
+   "date": "2026-09-23T16:52:10Z",
+   "file": "sessions/2026-09-23T165210Z.json",
+   "fcmaxAtSave": 180,
+   "overlapWarning": false,
+   "duration": 1251.164,
+   "distance": 4515.0,
+   "calories": 229.0,
+   "caloriesPolar": 172.0,
+   "avgWatts": 110.18,
+   "maxWatts": 157.0,
+   "avgCadence": 15.88,
+   "avgHr": 123.94,
+   "maxHr": 145.0,
+   "avgPace500": 138.56,
+   "efficiency": 0.8889,
+   "zonePct": [
+    16,
+    32,
+    50,
+    1,
+    0
+   ]
+  }
+ ]
+}

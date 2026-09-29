@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rowerboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <h1>Rowerboard</h1>
+    <span class="sub" id="subtitle"></span>
+    <button id="themeBtn" class="ghost" aria-label="Changer de thème">◐</button>
+  </div>
+</header>
+<main class="wrap">
+  <div id="msg" class="msg" hidden></div>
+
+  <section id="kpis" class="kpis"></section>
+
+  <section class="card">
+    <h2>Progression</h2>
+    <div class="grid2">
+      <figure><figcaption>Allure moyenne /500 m</figcaption><div class="chart"><canvas id="cPace"></canvas></div></figure>
+      <figure><figcaption>Puissance moyenne (W)</figcaption><div class="chart"><canvas id="cWatts"></canvas></div></figure>
+      <figure><figcaption>FC moyenne (bpm)</figcaption><div class="chart"><canvas id="cHr"></canvas></div></figure>
+      <figure><figcaption>Efficacité (W / bpm)</figcaption><div class="chart"><canvas id="cEff"></canvas></div></figure>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Historique</h2>
+    <div class="table-scroll"><table id="history"></table></div>
+  </section>
+
+  <section class="card" id="detail" hidden>
+    <h2 id="detailTitle"></h2>
+    <div id="detailWarn" class="msg warn" hidden>Le fichier Polar recouvre moins de la moitié de la séance : la FC est partielle.</div>
+    <div id="detailStats" class="stats"></div>
+    <figure><figcaption>Puissance et fréquence cardiaque</figcaption><div class="chart tall"><canvas id="dWattsHr"></canvas></div></figure>
+    <div class="grid2">
+      <figure><figcaption>Allure /500 m (fenêtre glissante)</figcaption><div class="chart"><canvas id="dPace"></canvas></div></figure>
+      <figure><figcaption>Cadence (coups/min)</figcaption><div class="chart"><canvas id="dCad"></canvas></div></figure>
+    </div>
+    <figure><figcaption>Temps passé par zone de FC</figcaption><div id="zones" class="zones"></div></figure>
+  </section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
