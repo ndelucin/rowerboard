@@ -9,7 +9,7 @@ Site : https://ndelucin.github.io/rowerboard/
 **Sommaire**
 
 - [Partie 1 · Le projet](#partie-1--le-projet) : à quoi sert le dépôt, comment il est organisé, comment l'utiliser
-- [Partie 2 · Comprendre le fonctionnement](#partie-2--comprendre-le-fonctionnement) : explications pédagogiques (fusion, dashboard, GitHub Pages)
+- [Partie 2 · Comprendre le fonctionnement](#partie-2--comprendre-le-fonctionnement) : explications pédagogiques (fusion, script de traitement, dashboard, GitHub Pages)
 
 ---
 
@@ -21,10 +21,14 @@ Deux appareils enregistrent la même séance, chacun de son côté : le rameur d
 
 ```mermaid
 flowchart LR
-    S4[TCX S4<br/>watts, distance] --> M
-    P[TCX Polar<br/>FC] --> M
-    M["merge_tcx.py<br/>(sur ton Mac)"] --> D["data/*.json"]
-    D -- git push --> R[Dépôt GitHub]
+    S4[TCX S4<br/>watts, distance] --> DL
+    P[TCX Polar<br/>FC] --> DL
+    DL["~/Downloads<br/>(exports manuels)"] --> PT
+    L["launcher.command<br/>(icône du Dock)"] -. lance .-> PT
+    PT["process_tcx_files.py<br/>ramasse, teste, commite"] --> M["merge_tcx.py<br/>fusion"]
+    M --> D["data/*.json"]
+    PT -- git push --> R[Dépôt GitHub]
+    D -.-> R
     R -- déclenche --> A[GitHub Actions]
     A -- publie --> W[GitHub Pages]
     W --> B[Navigateur]
@@ -32,7 +36,7 @@ flowchart LR
 
 Deux parties indépendantes, dont le seul point de contact est le JSON de `data/` :
 
-1. **Script local** (Python) : fusionne les deux TCX en JSON.
+1. **Scripts locaux** (Python) : `process_tcx_files.py` orchestre (ramassage des exports, tests, commit, push) et `merge_tcx.py` fusionne les deux TCX en JSON.
 2. **Dashboard** (HTML + JavaScript) : lit ces JSON et dessine tableaux et graphiques.
 
 ### Structure du dépôt
@@ -41,7 +45,8 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 |---|---|
 | `scripts/merge_tcx.py` | Script de fusion des fichiers TCX (Python 3.9+, bibliothèque standard) |
 | `scripts/process_tcx_files.py` | Ramasse les TCX exportés, fusionne, teste, commite et pousse (commande unique après une séance) |
-| `scripts/tests/` | Tests `pytest` |
+| `scripts/launcher.command` | Lanceur macOS : double-clic ou icône du Dock, ouvre Terminal et exécute `process_tcx_files.py` |
+| `scripts/tests/` | Tests `pytest` (fusion et traitement des exports) |
 | `data/` | JSON générés, publiés sur GitHub |
 | `dashboard/` | Site statique : `index.html`, `style.css`, `js/`, `vendor/` (Chart.js), `fonts/` |
 | `docs/schema.md` | Format précis des JSON |
@@ -55,30 +60,81 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 | **Séance** | Une séance de rameur : un fichier `data/sessions/<id>.json` avec son résumé et toute la série de mesures. L'`id` est l'heure de début |
 | **Catalogue** | `data/index.json` : la liste légère des séances (date, fichier, chiffres de synthèse), sans les séries |
 | **Script de fusion** | `merge_tcx.py` : lit les TCX, produit le fichier séance correspondant et met à jour le catalogue |
+| **Script de traitement** | `process_tcx_files.py` : la commande du quotidien. Range les exports, appelle la fusion, lance les tests, puis commite et pousse `data/` |
+| **Lanceur** | `launcher.command` : raccourci macOS (Dock) vers le script de traitement |
 | **Dashboard** | Le site : KPI, suivi de progression, historique, détail d'une séance |
 | **Workflow Pages** | `deploy-on-gh-pages.yml` : assemble et publie le site à chaque push sur `main` |
 
 ### Utilisation
 
-#### Ajouter une séance avec le script de traitement
+#### Ajouter une séance (cas courant)
 
-3 étapes nécessaires :
-- récupération manuelle du fichier TCX du moniteur sur [waterrowernohrdaccount.com](https://waterrowernohrdaccount.com/dashboard)
-- récupération manuelle du fichier TCX de la montre sur [Polar Flow](https://flow.polar.com/diary)
-- exécution du script de traitement
+Trois gestes, dont deux manuels :
+
+1. Exporter le TCX du moniteur depuis [waterrowernohrdaccount.com](https://waterrowernohrdaccount.com/dashboard).
+2. Exporter le TCX de la montre depuis [Polar Flow](https://flow.polar.com/diary).
+3. Lancer le traitement, par l'icône du Dock (voir plus bas) ou en ligne de commande :
 
 ```bash
 python3 scripts/process_tcx_files.py
 ```
 
-Sur macOS, `scripts/launcher.command` fait la même chose en un double-clic : on peut le glisser dans la partie droite du Dock (clic droit → Ouvrir la première fois, pour valider l'avertissement de sécurité).
+Les deux exports doivent arriver dans `~/Downloads` (dossier de téléchargement par défaut du navigateur). Le script fait tout le reste :
 
-`process_tcx_files.py` enchaîne tout le reste :
-1. ramasse les `.tcx` des dernières 24 h dans `~/Downloads`, les reconnaît par leur contenu (Watts = WaterRower, FC seule = Polar) et les range dans `input/data/s4/` ou `input/data/polar/` ;
-2. lance la fusion pour générer/mettre à jour les fichiers JSON de données ;
-3. s'il y a une nouvelle séance : lance les tests, commite `data/` (« Nouvelle séance AAAA-MM-JJ ») et pousse.
+```mermaid
+flowchart TD
+    A{"Arbre git propre ?<br/>(hors data/)"} -- non --> X1["Arrêt : rien n'est touché"]
+    A -- oui --> B["Ramasse les .tcx récents de ~/Downloads<br/>et les range dans input/data/s4 ou polar"]
+    B --> C["Fusion S4 + Polar<br/>(merge_tcx.py --auto)"]
+    C --> D{"data/ a changé ?"}
+    D -- non --> E["Rien de nouveau<br/>+ push des commits restés locaux"]
+    D -- oui --> F["Tests pytest"]
+    F -- échec --> X2["Arrêt : rien n'est commité"]
+    F -- succès --> G["Commit « Nouvelle séance AAAA-MM-JJ »"]
+    G --> H["git push, puis mise en ligne par GitHub Actions"]
+```
 
-Garde-fous : rien n'est poussé si `data/` n'a pas changé, si les tests échouent, ou si l'arbre git contient d'autres modifications (dans ce cas la commande s'arrête avant de toucher aux fichiers). Si un seul des deux exports est présent, elle le signale et attend l'autre.
+Dans le détail :
+1. **Ramassage** : seuls les `.tcx` modifiés dans les dernières 24 h sont pris. Chaque fichier est reconnu par son contenu (présence de Watts : WaterRower ; FC seule : Polar), pas par son nom. Les fichiers sont **déplacés** (pas copiés) vers `input/data/s4/` ou `input/data/polar/`.
+2. **Fusion** : chaque S4 est apparié au Polar dont l'heure de début est la plus proche (à ±5 min). La FC max pour les zones est fixée à 180.
+3. **Tests puis commit** : dès que `data/` a changé, les tests tournent. S'ils passent, `data/` est commité (« Nouvelle séance AAAA-MM-JJ », ou « Nouvelles séances … » s'il y en a plusieurs) et poussé.
+4. **Mise en ligne** : le push déclenche le workflow Pages, et le site est à jour en une minute environ.
+
+Un récapitulatif s'affiche dans le terminal : fichiers ramassés, séance créée (date · durée · distance · allure /2000 m), commit, push.
+
+##### Lancer depuis le Dock (macOS)
+
+`scripts/launcher.command` exécute la commande ci-dessus et garde la fenêtre ouverte jusqu'à une touche, pour lire le résultat ou l'erreur. Pour l'installer :
+
+1. Dans le Finder, ouvrir le dossier `scripts/` du dépôt.
+2. Glisser `launcher.command` dans la partie droite du Dock (à côté de la corbeille).
+3. Au premier clic : clic droit sur l'icône, puis **Ouvrir**, pour valider l'avertissement de sécurité de macOS.
+
+Le lanceur retrouve le dépôt à partir de son propre emplacement : il n'y a pas de chemin à configurer.
+
+##### Garde-fous
+
+- **Arbre git propre** : si autre chose que `data/` est modifié ou non suivi (y compris un nouveau fichier), le script s'arrête **avant** de toucher à quoi que ce soit. Il faut commiter ou ranger ces changements d'abord.
+- **Tests obligatoires** : rien n'est commité si les tests échouent, y compris à la relance d'un traitement interrompu. Sans `.venv`, les tests sont sautés avec un avertissement : créer le venv (voir [Lancer les tests](#lancer-les-tests)).
+- **Pas de doublon** : une séance est identifiée par son heure de début. Un fichier dont la séance est déjà rangée reste dans `~/Downloads`. Si seul le *nom* est déjà pris (par exemple `workout.tcx` d'une autre séance), le nouveau fichier est renommé avec son heure de début au lieu d'écraser l'ancien.
+- **Fichiers inexploitables** : un TCX non reconnu ou sans heure de début est ignoré et laissé dans `~/Downloads`, avec un avertissement. Il ne bloque pas les autres.
+- **Un seul export présent** : le script le signale et attend l'autre.
+- **Push rattrapé** : si un push a échoué (réseau coupé), un commit reste local. À la prochaine exécution, même sans nouvelle séance, il est poussé.
+
+##### En cas de problème
+
+| Message ou symptôme | Que faire |
+|---|---|
+| `L'arbre git contient d'autres modifications…` | Commiter ou ranger les fichiers listés, puis relancer |
+| `Il manque l'export Polar` (ou WaterRower) | Exporter l'autre fichier dans `~/Downloads`, puis relancer : le premier est déjà rangé dans `input/` |
+| `Les tests échouent, rien n'est commité` | Corriger la cause, puis relancer. Les TCX sont déjà dans `input/` et `data/` déjà régénéré : le script relance simplement les tests puis commite |
+| `TCX non reconnu ou sans heure de début` | Le fichier n'est pas un export S4 ou Polar valide : le réexporter |
+| `Déjà présent (même séance)` | Cette séance est déjà dans `input/` : rien à faire |
+| Aucun fichier ramassé alors qu'il existe | Il date de plus de 24 h : relancer avec `--since 72`, ou `--downloads` s'il est ailleurs |
+| `(FC partielle !)` | Le fichier Polar couvre moins de la moitié de la séance : la FC et les zones sont peu fiables |
+| Push refusé ou réseau coupé | Relancer plus tard : le commit local sera poussé |
+
+> ⚠️ `input/` est gitignoré et les exports y sont **déplacés** : c'est la seule copie des TCX bruts. À sauvegarder si on tient à pouvoir régénérer `data/`.
 
 | Option | Effet |
 |---|---|
@@ -102,7 +158,7 @@ git add data && git commit -m "Nouvelle séance" && git push
 python3 scripts/merge_tcx.py --s4 fichier_s4.tcx --polar fichier_polar.tcx --fcmax 180
 ```
 
-Relancer le script ne crée pas de doublon : une séance est identifiée par son heure de début.
+Relancer la fusion ne crée pas de doublon : une séance est identifiée par son heure de début.
 
 #### Tester en local
 
@@ -119,6 +175,8 @@ Puis ouvrir http://localhost:8000. Il faut refaire la copie après chaque modifi
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest scripts
 ```
+
+Les tests du traitement fabriquent leurs propres TCX dans un dépôt git temporaire. Quelques tests de fusion lisent en plus les vrais exports de `input/` et sont sautés s'il est absent.
 
 ### Sécurité
 
@@ -148,12 +206,61 @@ Cette partie explique comment les choses marchent, pour pouvoir modifier le proj
 
 #### `index.json` et les séances
 
-- `data/sessions/<id>.json` : une séance complète, avec toute la série de mesures (~300 points). Format détaillé dans [docs/schema.md](docs/schema.md).
+- `data/sessions/<id>.json` : une séance complète, avec toute la série de mesures (plusieurs centaines de points). Format détaillé dans [docs/schema.md](docs/schema.md).
 - `data/index.json` : le **catalogue léger** des séances. Une entrée par séance, avec date, chemin du fichier et chiffres de synthèse, mais sans la série.
 
 Le dashboard charge d'abord `index.json` (indicateurs, historique et graphiques de progression), puis ne télécharge le fichier complet d'une séance que lorsqu'on clique dessus. GitHub Pages ne sait pas lister un dossier : sans index, le navigateur ne pourrait pas connaître les séances existantes. `index.json` est régénéré par le script, on ne le modifie pas à la main.
 
-### 2.2 Le dashboard
+### 2.2 Le script de traitement
+
+`process_tcx_files.py` ne calcule rien lui-même : il **orchestre**. La fusion reste dans `merge_tcx.py` (il l'importe), et le script ajoute autour la logistique : trouver les fichiers, protéger le dépôt, tester, publier.
+
+#### Les étapes dans le code
+
+| Fonction | Rôle |
+|---|---|
+| `classify` | Lit un TCX et le range : `s4` (contient des Watts), `polar` (FC sans Watts) ou rien (pas un TCX exploitable) |
+| `collect` | Parcourt `~/Downloads`, ignore ce qui est trop ancien ou inexploitable, détecte les doublons par heure de début, déplace les fichiers vers `input/` |
+| `dirty_paths`, `outside_data` | Lisent `git status` pour vérifier que seul `data/` est modifié |
+| `committed_index` | Lit `data/index.json` **tel qu'il est dans le dernier commit** : sert à savoir quelles séances sont nouvelles |
+| `unpushed_count` | Compte les commits locaux pas encore poussés |
+| `run_pytest` | Lance les tests du `.venv` ; leur échec arrête tout |
+| `describe` | Met en forme la ligne de résumé d'une séance |
+| `process` | Enchaîne le tout (voir le schéma ci-dessous) |
+| `main` | Lit les options de la ligne de commande et affiche les erreurs proprement |
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Toi (Dock ou terminal)
+    participant PT as process_tcx_files.py
+    participant DL as ~/Downloads
+    participant IN as input/data/
+    participant M as merge_tcx.py
+    participant G as git / GitHub
+
+    U->>PT: lance (launcher.command)
+    PT->>G: git status : seul data/ est-il modifié ?
+    PT->>DL: cherche les .tcx récents
+    PT->>IN: classe puis déplace (s4/ ou polar/)
+    PT->>M: --auto : apparie et fusionne
+    M->>G: écrit data/sessions/*.json et data/index.json
+    PT->>G: data/ a-t-il changé ?
+    PT->>PT: pytest
+    PT->>G: git commit + git push
+    G-->>U: GitHub Actions publie le site
+```
+
+#### Choix de conception
+
+- **Reconnaître par le contenu, pas par le nom** : les noms d'export changent selon l'appareil et la date ; la présence de Watts distingue sans ambiguïté le S4 de la montre.
+- **« Nouveau » = absent du dernier commit**, pas absent du disque. Si un traitement précédent a fusionné puis échoué aux tests, la séance est déjà dans `data/` mais pas dans git : la comparer au disque la ferait passer pour « ancienne » et contournerait les tests.
+- **Tests avant commit, toujours** : dès que `data/` a changé, quelle que soit la raison.
+- **Rien n'est commité tant que l'arbre n'est pas propre** : `git add data` ne doit embarquer que des sorties de la fusion.
+- **Un fichier illisible n'en bloque pas d'autres** : il est ignoré au ramassage, et la fusion saute une paire fautive pour continuer avec les suivantes (en renvoyant un code d'erreur à la fin).
+- **Déplacer plutôt que copier** : `~/Downloads` reste propre et un second passage ne retrouve pas les mêmes fichiers. Contrepartie : `input/` devient l'unique copie.
+
+### 2.3 Le dashboard
 
 Le dashboard est un site **statique sans build** : on écrit des fichiers HTML, CSS et JavaScript, et le navigateur les exécute tels quels. Il n'y a ni framework, ni `npm`, ni compilation.
 
@@ -213,7 +320,7 @@ Au chargement, `main.js` déroule ces étapes :
 
 Tout se passe dans le navigateur : le serveur (Pages) ne fait que servir les fichiers.
 
-### 2.3 GitHub Pages et le déploiement
+### 2.4 GitHub Pages et le déploiement
 
 **GitHub Pages est un simple serveur de fichiers statiques** : pas de base de données, pas de code exécuté côté serveur. Tout le calcul de l'affichage se fait dans le navigateur du visiteur.
 

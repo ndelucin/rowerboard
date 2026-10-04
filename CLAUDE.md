@@ -4,6 +4,7 @@ Fusionne les exports TCX WaterRower S4 + Polar (FC) en JSON, affichés par un da
 
 - `scripts/merge_tcx.py` : CLI de fusion (Python 3.9+, stdlib). `python scripts/merge_tcx.py --auto` lit `input/data/{s4,polar}` et écrit `data/`.
 - `scripts/process_tcx_files.py` : après export manuel des 2 TCX, ramasse `~/Downloads`, appelle la fusion, lance les tests puis commit + push `data/` (options `--dry-run`, `--no-push`).
+- `scripts/launcher.command` : lanceur macOS (Dock) qui exécute `process_tcx_files.py` et garde la fenêtre ouverte.
 - `data/` : sorties JSON poussées sur GitHub. `input/` : sources brutes, gitignorées.
 - `docs/schema.md` : contrat JSON, à mettre à jour avec tout changement de format.
 - `dashboard/` : site statique sans build (HTML + modules ES + Chart.js hébergé dans `dashboard/vendor/`, police dans `dashboard/fonts/`). Le workflow `.github/workflows/deploy-on-gh-pages.yml` copie `dashboard/` et `data/` dans `_site/` puis le publie sur GitHub Pages. Test local : reproduire ces `cp` puis `cd _site && python3 -m http.server 8000`.
