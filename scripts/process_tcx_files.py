@@ -43,6 +43,7 @@ def classify(path: Path) -> str | None:
 
 
 def _start(path: Path):
+    """Heure de début d'un TCX (lue dans le fichier), ou None s'il est illisible."""
     try:
         return m._start_of(path)
     except (ValueError, KeyError, OSError):
@@ -55,7 +56,11 @@ def _starts(directory: Path) -> set:
 
 
 def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_run: bool):
-    """Déplace les TCX récents de `downloads` vers les dossiers d'entrée. Retourne {'s4': [...], 'polar': [...]}."""
+    """Déplace les TCX récents de `downloads` vers les dossiers d'entrée. Retourne {'s4': [...], 'polar': [...]}.
+
+    Ne touche qu'aux fichiers modifiés depuis `since_h` heures. Un fichier dont la séance est déjà
+    rangée (même nom ou même heure de début) est laissé dans Downloads. En `dry_run`, on liste sans déplacer.
+    """
     moved = {"s4": [], "polar": []}
     if not downloads.is_dir():
         raise ProcessError(f"Dossier introuvable : {downloads}")
@@ -83,6 +88,7 @@ def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_
 # --- Git --------------------------------------------------------------------
 
 def git(root: Path, *args: str) -> str:
+    """Lance `git <args>` dans `root` et retourne sa sortie ; lève ProcessError si la commande échoue."""
     r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
     if r.returncode != 0:
         raise ProcessError(f"git {' '.join(args)} a échoué :\n{r.stderr.strip() or r.stdout.strip()}")
@@ -95,12 +101,14 @@ def dirty_paths(root: Path) -> list[str]:
 
 
 def outside_data(paths: list[str], data_rel: str) -> list[str]:
+    """Parmi `paths`, ceux qui ne sont pas dans `data_rel` : seules les modifs de data/ sont attendues."""
     return [p for p in paths if not (p.strip('"') + "/").startswith(data_rel + "/")]
 
 
 # --- Rapport ----------------------------------------------------------------
 
 def load_index(data_dir: Path) -> dict:
+    """Lit data/index.json et retourne {id de séance: entrée}. Vide si le fichier n'existe pas encore."""
     p = data_dir / "index.json"
     if not p.exists():
         return {}
@@ -108,6 +116,7 @@ def load_index(data_dir: Path) -> dict:
 
 
 def describe(e: dict) -> str:
+    """Résumé d'une séance sur une ligne : date · durée · distance · allure /2000 m."""
     d = e["date"][:10]
     pace = e.get("avgPace500")
     p2000 = f"{int(pace * 4 // 60)}:{int(pace * 4 % 60):02d}" if pace else "–"
@@ -115,6 +124,7 @@ def describe(e: dict) -> str:
 
 
 def run_pytest(root: Path) -> None:
+    """Lance les tests avec le pytest du .venv ; lève ProcessError s'ils échouent (donc pas de commit)."""
     exe = root / ".venv" / "bin" / "pytest"
     if not exe.exists():
         print("! .venv absent : tests non lancés")
@@ -127,15 +137,18 @@ def run_pytest(root: Path) -> None:
 # --- Orchestration ----------------------------------------------------------
 
 def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool, run_tests: bool = True) -> int:
+    """Enchaîne : vérif git propre → ramassage → fusion → rapport → tests → commit → push. Retourne le code de sortie."""
     s4_dir, polar_dir = root / "input" / "data" / "s4", root / "input" / "data" / "polar"
     data_dir = root / "data"
 
+    # 1. Garde-fou : on ne commite que data/, donc tout autre changement git doit être réglé avant.
     other = outside_data(dirty_paths(root), "data")
     if other and dry_run:
         print("! Autres modifications git (une vraie exécution s'arrêterait) : " + ", ".join(other))
     elif other:
         raise ProcessError("L'arbre git contient d'autres modifications, commit ou range-les d'abord :\n  " + "\n  ".join(other))
 
+    # 2. Ramassage des TCX dans Downloads ; on signale s'il manque l'un des deux exports.
     moved = collect(downloads, s4_dir, polar_dir, since_h, dry_run)
     if bool(moved["s4"]) != bool(moved["polar"]):
         missing = "Polar" if moved["s4"] else "WaterRower (S4)"
@@ -144,11 +157,13 @@ def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bo
         print("Simulation : rien n'a été déplacé, fusionné ni poussé.")
         return 0
 
+    # 3. Fusion S4 + Polar. On compare l'index avant/après pour savoir quelles séances sont nouvelles.
     before = load_index(data_dir)
     rc = m.main(["--auto", "--s4-dir", str(s4_dir), "--polar-dir", str(polar_dir), "--out", str(data_dir)])
     if rc != 0:
         raise ProcessError("La fusion a échoué, rien n'est commité.")
 
+    # 4. Si data/ n'a pas changé, il n'y a rien à commiter.
     if not git(root, "status", "--porcelain", "data").strip():
         print("Rien de nouveau : data/ est déjà à jour.")
         return 0
@@ -160,6 +175,7 @@ def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bo
     if run_tests and new:
         run_pytest(root)
 
+    # 5. Message de commit selon le nombre de séances ajoutées, puis commit et push (sauf --no-push).
     if len(new) == 1:
         msg = f"Nouvelle séance {new[0]['date'][:10]}"
     elif new:
@@ -178,6 +194,7 @@ def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bo
 
 
 def main(argv=None) -> int:
+    """Point d'entrée CLI : lit les options, appelle process() et affiche proprement les ProcessError."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--downloads", type=Path, default=DEFAULT_DOWNLOADS, help="dossier des exports (défaut : ~/Downloads)")
     ap.add_argument("--since", type=float, default=DEFAULT_SINCE_H, help="ne prend que les fichiers des N dernières heures (défaut : 24)")
