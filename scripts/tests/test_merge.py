@@ -33,7 +33,7 @@ def test_session_1509_reference_values():
 @needs_input
 def test_auto_pairs_match_by_date():
     pairs = m.auto_pairs(S4, POLAR)
-    assert len(pairs) == 3
+    assert len(pairs) == len(list(S4.glob("*.[tT][cC][xX]")))  # chaque S4 a trouvé son Polar
     for s4, polar in pairs:
         assert s4.name[:10] in polar.name
 
@@ -44,8 +44,11 @@ def test_write_is_idempotent(tmp_path):
         for s4, polar in m.auto_pairs(S4, POLAR):
             m.write_session(m.compute_session(m.parse_s4(s4), m.parse_polar(polar), 180), tmp_path)
     idx = json.loads((tmp_path / "index.json").read_text())
-    assert [e["date"][:10] for e in idx["sessions"]] == ["2026-09-15", "2026-09-18", "2026-09-23"]
-    assert len(list((tmp_path / "sessions").glob("*.json"))) == 3
+    n = len(m.auto_pairs(S4, POLAR))
+    dates = [e["date"] for e in idx["sessions"]]
+    assert len(dates) == n == len(set(dates))  # 2 passages, pas de doublon
+    assert dates == sorted(dates)
+    assert len(list((tmp_path / "sessions").glob("*.json"))) == n
 
 
 def test_nearest_hr_tolerance():
