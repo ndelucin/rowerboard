@@ -71,6 +71,8 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 python3 scripts/process_tcx_files.py
 ```
 
+Sur macOS, `scripts/launcher.command` fait la même chose en un double-clic : on peut le glisser dans la partie droite du Dock (clic droit → Ouvrir la première fois, pour valider l'avertissement de sécurité).
+
 `process_tcx_files.py` enchaîne tout le reste :
 1. ramasse les `.tcx` des dernières 24 h dans `~/Downloads`, les reconnaît par leur contenu (Watts = WaterRower, FC seule = Polar) et les range dans `input/data/s4/` ou `input/data/polar/` ;
 2. lance la fusion pour générer/mettre à jour les fichiers JSON de données ;
