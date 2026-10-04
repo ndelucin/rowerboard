@@ -58,29 +58,39 @@ def _starts(directory: Path) -> set:
 def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_run: bool):
     """Déplace les TCX récents de `downloads` vers les dossiers d'entrée. Retourne {'s4': [...], 'polar': [...]}.
 
-    Ne touche qu'aux fichiers modifiés depuis `since_h` heures. Un fichier dont la séance est déjà
-    rangée (même nom ou même heure de début) est laissé dans Downloads. En `dry_run`, on liste sans déplacer.
+    Ne touche qu'aux fichiers modifiés depuis `since_h` heures. Un TCX sans heure de début lisible est
+    ignoré (il ferait planter la fusion). Une séance déjà rangée (même heure de début) est laissée dans
+    Downloads ; si seul le nom de fichier est déjà pris, le nouveau fichier est renommé avec son heure
+    de début. En `dry_run`, on liste sans déplacer.
     """
     moved = {"s4": [], "polar": []}
     if not downloads.is_dir():
         raise ProcessError(f"Dossier introuvable : {downloads}")
     limit = time.time() - since_h * 3600
+    known = {"s4": _starts(s4_dir), "polar": _starts(polar_dir)}  # heures de début déjà rangées, par type
     for p in sorted(downloads.glob("*.[tT][cC][xX]")):
-        if p.stat().st_mtime < limit:
+        try:
+            if p.stat().st_mtime < limit:
+                continue
+        except OSError:  # lien symbolique cassé, fichier disparu…
             continue
         kind = classify(p)
-        if kind is None:
-            print(f"! Ignoré (TCX non reconnu) : {p.name}", file=sys.stderr)
+        start = _start(p) if kind else None
+        if kind is None or start is None:
+            print(f"! Ignoré (TCX non reconnu ou sans heure de début) : {p.name}", file=sys.stderr)
+            continue
+        if start in known[kind]:
+            print(f"= Déjà présent (même séance), laissé dans {downloads.name}/ : {p.name}")
             continue
         dest_dir = s4_dir if kind == "s4" else polar_dir
         dest = dest_dir / p.name
-        if dest.exists() or _start(p) in _starts(dest_dir):
-            print(f"= Déjà présent (même séance), laissé dans {downloads.name}/ : {p.name}")
-            continue
-        print(f"→ {kind:5} {p.name}")
+        if dest.exists():  # même nom mais autre séance : on ne l'écrase pas et on ne l'ignore pas
+            dest = dest_dir / f"{p.stem}_{start:%Y%m%dT%H%M%S}{p.suffix}"
+        print(f"→ {kind:5} {p.name}" + (f" (renommé {dest.name})" if dest.name != p.name else ""))
         if not dry_run:
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(p), dest)
+        known[kind].add(start)
         moved[kind].append(p.name)
     return moved
 
@@ -113,6 +123,24 @@ def load_index(data_dir: Path) -> dict:
     if not p.exists():
         return {}
     return {e["id"]: e for e in json.loads(p.read_text(encoding="utf-8")).get("sessions", [])}
+
+
+def committed_index(root: Path) -> dict:
+    """Index tel qu'il est dans le dernier commit (vide s'il n'y en a pas encore).
+
+    Sert de référence pour savoir ce qui est « nouveau » : contrairement à l'état du disque, il reste
+    juste si une exécution précédente a fusionné sans aboutir à un commit.
+    """
+    r = subprocess.run(["git", "show", "HEAD:data/index.json"], cwd=root, capture_output=True, text=True)
+    if r.returncode != 0:
+        return {}
+    return {e["id"]: e for e in json.loads(r.stdout).get("sessions", [])}
+
+
+def unpushed_count(root: Path) -> int:
+    """Nombre de commits locaux pas encore poussés (0 si aucune branche distante n'est suivie)."""
+    r = subprocess.run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=root, capture_output=True, text=True)
+    return int(r.stdout) if r.returncode == 0 else 0
 
 
 def describe(e: dict) -> str:
@@ -157,22 +185,28 @@ def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bo
         print("Simulation : rien n'a été déplacé, fusionné ni poussé.")
         return 0
 
-    # 3. Fusion S4 + Polar. On compare l'index avant/après pour savoir quelles séances sont nouvelles.
-    before = load_index(data_dir)
+    # 3. Fusion S4 + Polar. Les séances « nouvelles » sont celles absentes du dernier commit.
+    before = committed_index(root)
     rc = m.main(["--auto", "--s4-dir", str(s4_dir), "--polar-dir", str(polar_dir), "--out", str(data_dir)])
     if rc != 0:
         raise ProcessError("La fusion a échoué, rien n'est commité.")
 
-    # 4. Si data/ n'a pas changé, il n'y a rien à commiter.
+    # 4. Si data/ n'a pas changé, il n'y a rien à commiter ; mais on rattrape un push qui avait échoué.
     if not git(root, "status", "--porcelain", "data").strip():
         print("Rien de nouveau : data/ est déjà à jour.")
+        ahead = unpushed_count(root)
+        if push and ahead:
+            git(root, "push")
+            print(f"✓ {ahead} commit(s) en attente poussé(s). Le site sera à jour dans ~1 min : {SITE_URL}")
+        elif ahead:
+            print(f"! {ahead} commit(s) local(aux) pas encore poussé(s).")
         return 0
 
     after = load_index(data_dir)
     new = [after[i] for i in after if i not in before]
     for e in new:
         print(f"★ Nouvelle séance : {describe(e)}" + ("  (FC partielle !)" if e.get("overlapWarning") else ""))
-    if run_tests and new:
+    if run_tests:  # toujours, dès que data/ a changé : même si la séance a été fusionnée par un run précédent
         run_pytest(root)
 
     # 5. Message de commit selon le nombre de séances ajoutées, puis commit et push (sauf --no-push).

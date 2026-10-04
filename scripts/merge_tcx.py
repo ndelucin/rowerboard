@@ -231,12 +231,23 @@ def _start_of(path: Path) -> datetime:
     return parse_time(lap.attrib["StartTime"])
 
 
+def _safe_start(path: Path):
+    """Heure de début, ou None (avec un message) si le fichier est inexploitable : il est alors sauté."""
+    try:
+        return _start_of(path)
+    except (ValueError, KeyError, OSError, ET.ParseError) as e:
+        print(f"! Fichier ignoré ({path.name}) : {e!r}", file=sys.stderr)
+        return None
+
+
 def auto_pairs(s4_dir: Path, polar_dir: Path, window_s: float = AUTO_PAIR_WINDOW_S):
     """Apparie chaque fichier S4 au fichier Polar de début le plus proche (dans la fenêtre)."""
-    polars = [(p, _start_of(p)) for p in sorted(polar_dir.glob("*.[tT][cC][xX]"))]
+    polars = [(p, t) for p in sorted(polar_dir.glob("*.[tT][cC][xX]")) if (t := _safe_start(p))]
     pairs, used = [], set()
     for s4 in sorted(s4_dir.glob("*.[tT][cC][xX]")):
-        t0 = _start_of(s4)
+        t0 = _safe_start(s4)
+        if t0 is None:
+            continue
         cands = [(abs((t - t0).total_seconds()), p) for p, t in polars if p not in used]
         cands = [c for c in cands if c[0] <= window_s]
         if not cands:
@@ -266,16 +277,18 @@ def main(argv=None) -> int:
     else:
         ap.error("indiquer --s4 et --polar, ou --auto")
 
+    rc = 0
     for s4_path, polar_path in pairs:
         try:
             session = compute_session(parse_s4(s4_path), parse_polar(polar_path), args.fcmax)
         except ValueError as e:
             print(f"✗ {e}", file=sys.stderr)
-            return 1
+            rc = 1  # on continue : une paire fautive ne doit pas bloquer les suivantes
+            continue
         out = write_session(session, args.out)
         warn = " (chevauchement FC insuffisant !)" if session["overlapWarning"] else ""
         print(f"✓ {s4_path.name} + {polar_path.name} → {out}{warn}")
-    return 0
+    return rc
 
 
 if __name__ == "__main__":
