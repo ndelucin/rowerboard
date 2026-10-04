@@ -2,7 +2,7 @@
 """Ramasse les TCX exportés (~/Downloads), fusionne, puis commit + push data/.
 
 Usage typique après une séance : exporter le TCX sur waterrowernohrdaccount.com et sur Polar Flow,
-puis lancer `python3 scripts/sync.py`.
+puis lancer `python3 scripts/process_tcx_files.py`.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ DEFAULT_DOWNLOADS = Path.home() / "Downloads"
 DEFAULT_SINCE_H = 24.0
 
 
-class SyncError(Exception):
+class ProcessError(Exception):
     """Arrêt propre : le message est affiché tel quel."""
 
 
@@ -58,7 +58,7 @@ def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_
     """Déplace les TCX récents de `downloads` vers les dossiers d'entrée. Retourne {'s4': [...], 'polar': [...]}."""
     moved = {"s4": [], "polar": []}
     if not downloads.is_dir():
-        raise SyncError(f"Dossier introuvable : {downloads}")
+        raise ProcessError(f"Dossier introuvable : {downloads}")
     limit = time.time() - since_h * 3600
     for p in sorted(downloads.glob("*.[tT][cC][xX]")):
         if p.stat().st_mtime < limit:
@@ -85,7 +85,7 @@ def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_
 def git(root: Path, *args: str) -> str:
     r = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True)
     if r.returncode != 0:
-        raise SyncError(f"git {' '.join(args)} a échoué :\n{r.stderr.strip() or r.stdout.strip()}")
+        raise ProcessError(f"git {' '.join(args)} a échoué :\n{r.stderr.strip() or r.stdout.strip()}")
     return r.stdout
 
 
@@ -121,12 +121,12 @@ def run_pytest(root: Path) -> None:
         return
     r = subprocess.run([str(exe), "-q", "scripts"], cwd=root, capture_output=True, text=True)
     if r.returncode != 0:
-        raise SyncError("Les tests échouent, rien n'est commité :\n" + (r.stdout + r.stderr).strip())
+        raise ProcessError("Les tests échouent, rien n'est commité :\n" + (r.stdout + r.stderr).strip())
 
 
 # --- Orchestration ----------------------------------------------------------
 
-def sync(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool, run_tests: bool = True) -> int:
+def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool, run_tests: bool = True) -> int:
     s4_dir, polar_dir = root / "input" / "data" / "s4", root / "input" / "data" / "polar"
     data_dir = root / "data"
 
@@ -134,7 +134,7 @@ def sync(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool,
     if other and dry_run:
         print("! Autres modifications git (une vraie exécution s'arrêterait) : " + ", ".join(other))
     elif other:
-        raise SyncError("L'arbre git contient d'autres modifications, commit ou range-les d'abord :\n  " + "\n  ".join(other))
+        raise ProcessError("L'arbre git contient d'autres modifications, commit ou range-les d'abord :\n  " + "\n  ".join(other))
 
     moved = collect(downloads, s4_dir, polar_dir, since_h, dry_run)
     if bool(moved["s4"]) != bool(moved["polar"]):
@@ -147,7 +147,7 @@ def sync(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool,
     before = load_index(data_dir)
     rc = m.main(["--auto", "--s4-dir", str(s4_dir), "--polar-dir", str(polar_dir), "--out", str(data_dir)])
     if rc != 0:
-        raise SyncError("La fusion a échoué, rien n'est commité.")
+        raise ProcessError("La fusion a échoué, rien n'est commité.")
 
     if not git(root, "status", "--porcelain", "data").strip():
         print("Rien de nouveau : data/ est déjà à jour.")
@@ -185,8 +185,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-push", action="store_true", help="commit local, sans push")
     args = ap.parse_args(argv)
     try:
-        return sync(m.ROOT, args.downloads, args.since, args.dry_run, push=not args.no_push)
-    except SyncError as e:
+        return process(m.ROOT, args.downloads, args.since, args.dry_run, push=not args.no_push)
+    except ProcessError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 1
 

@@ -40,7 +40,7 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 | Chemin | Rôle |
 |---|---|
 | `scripts/merge_tcx.py` | Script de fusion des fichiers TCX (Python 3.9+, bibliothèque standard) |
-| `scripts/sync.py` | Ramasse les TCX exportés, fusionne, teste, commite et pousse (commande unique après une séance) |
+| `scripts/process_tcx_files.py` | Ramasse les TCX exportés, fusionne, teste, commite et pousse (commande unique après une séance) |
 | `scripts/tests/` | Tests `pytest` |
 | `data/` | JSON générés, publiés sur GitHub |
 | `dashboard/` | Site statique : `index.html`, `style.css`, `js/`, `vendor/` (Chart.js), `fonts/` |
@@ -60,18 +60,18 @@ Deux parties indépendantes, dont le seul point de contact est le JSON de `data/
 
 ### Utilisation
 
-#### Ajouter une séance avec script de synchro
+#### Ajouter une séance avec le script de traitement
 
 3 étapes nécessaires :
 - récupération manuelle du fichier TCX du moniteur sur [waterrowernohrdaccount.com](https://waterrowernohrdaccount.com/dashboard)
 - récupération manuelle du fichier TCX de la montre sur [Polar Flow](https://flow.polar.com/diary)
-- exécution du script de synchronisation
+- exécution du script de traitement
 
 ```bash
-python3 scripts/sync.py
+python3 scripts/process_tcx_files.py
 ```
 
-`sync.py` enchaîne tout le reste :
+`process_tcx_files.py` enchaîne tout le reste :
 1. ramasse les `.tcx` des dernières 24 h dans `~/Downloads`, les reconnaît par leur contenu (Watts = WaterRower, FC seule = Polar) et les range dans `input/data/s4/` ou `input/data/polar/` ;
 2. lance la fusion pour générer/mettre à jour les fichiers JSON de données ;
 3. s'il y a une nouvelle séance : lance les tests, commite `data/` (« Nouvelle séance AAAA-MM-JJ ») et pousse.
@@ -87,7 +87,7 @@ Garde-fous : rien n'est poussé si `data/` n'a pas changé, si les tests échoue
 
 #### Ajouter une séance à la main
 
-Sans `sync.py` : dépose les deux exports dans `input/data/s4/` et `input/data/polar/`, puis :
+Sans `process_tcx_files.py` : dépose les deux exports dans `input/data/s4/` et `input/data/polar/`, puis :
 
 ```bash
 python3 scripts/merge_tcx.py --auto

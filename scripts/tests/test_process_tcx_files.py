@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import sync  # noqa: E402
+import process_tcx_files as pt  # noqa: E402
 
 NS = 'xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"'
 
@@ -52,17 +52,17 @@ def test_classify(tmp_path):
     (tmp_path / "b.tcx").write_text(polar_tcx())
     (tmp_path / "c.tcx").write_text("<nope")
     (tmp_path / "d.tcx").write_text(f'<TrainingCenterDatabase {NS}/>')
-    assert sync.classify(tmp_path / "a.tcx") == "s4"
-    assert sync.classify(tmp_path / "b.tcx") == "polar"
-    assert sync.classify(tmp_path / "c.tcx") is None
-    assert sync.classify(tmp_path / "d.tcx") is None
+    assert pt.classify(tmp_path / "a.tcx") == "s4"
+    assert pt.classify(tmp_path / "b.tcx") == "polar"
+    assert pt.classify(tmp_path / "c.tcx") is None
+    assert pt.classify(tmp_path / "d.tcx") is None
 
 
 def test_dry_run_moves_nothing(repo):
     root, dl = repo
     (dl / "w.tcx").write_text(s4_tcx())
     (dl / "p.TCX").write_text(polar_tcx())
-    assert sync.sync(root, dl, 24, dry_run=True, push=False, run_tests=False) == 0
+    assert pt.process(root, dl, 24, dry_run=True, push=False, run_tests=False) == 0
     assert (dl / "w.tcx").exists() and (dl / "p.TCX").exists()
     assert not (root / "input").exists()
     assert git(root, "log", "--oneline").count("\n") == 1
@@ -73,20 +73,20 @@ def test_full_flow_commits_once_then_idempotent(repo):
     (dl / "w.tcx").write_text(s4_tcx())
     (dl / "p.tcx").write_text(polar_tcx())
     (dl / "notes.txt").write_text("x")
-    assert sync.sync(root, dl, 24, dry_run=False, push=False, run_tests=False) == 0
+    assert pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False) == 0
     assert not (dl / "w.tcx").exists() and (root / "input/data/s4/w.tcx").exists()
     assert (dl / "notes.txt").exists()
     assert git(root, "log", "-1", "--format=%s").strip() == "Nouvelle séance 2026-09-15"
     assert "data/index.json" in git(root, "show", "--name-only", "--format=", "HEAD")
     # 2e passage : rien à faire, pas de nouveau commit
-    assert sync.sync(root, dl, 24, dry_run=False, push=False, run_tests=False) == 0
+    assert pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False) == 0
     assert git(root, "log", "--oneline").count("\n") == 2
 
 
 def test_single_file_makes_no_commit(repo, capsys):
     root, dl = repo
     (dl / "w.tcx").write_text(s4_tcx())
-    sync.sync(root, dl, 24, dry_run=False, push=False, run_tests=False)
+    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False)
     assert "Il manque l'export Polar" in capsys.readouterr().out
     assert git(root, "log", "--oneline").count("\n") == 1
 
@@ -95,8 +95,8 @@ def test_refuses_when_other_files_are_modified(repo):
     root, dl = repo
     (root / "README.md").write_text("modif")
     (dl / "w.tcx").write_text(s4_tcx())
-    with pytest.raises(sync.SyncError, match="README.md"):
-        sync.sync(root, dl, 24, dry_run=False, push=False, run_tests=False)
+    with pytest.raises(pt.ProcessError, match="README.md"):
+        pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False)
     assert (dl / "w.tcx").exists()  # rien n'a bougé
 
 
@@ -107,7 +107,7 @@ def test_old_files_are_ignored(repo):
     f.write_text(s4_tcx())
     old = time.time() - 72 * 3600
     os.utime(f, (old, old))
-    assert sync.collect(dl, root / "s4", root / "polar", 24, dry_run=False) == {"s4": [], "polar": []}
+    assert pt.collect(dl, root / "s4", root / "polar", 24, dry_run=False) == {"s4": [], "polar": []}
     assert f.exists()
 
 
@@ -115,6 +115,6 @@ def test_same_session_with_other_name_is_not_duplicated(repo):
     root, dl = repo
     (dl / "w.tcx").write_text(s4_tcx())
     (dl / "w (1).tcx").write_text(s4_tcx())
-    moved = sync.collect(dl, root / "s4", root / "polar", 24, dry_run=False)
+    moved = pt.collect(dl, root / "s4", root / "polar", 24, dry_run=False)
     assert len(moved["s4"]) == 1
     assert len(list((dl).glob("*.tcx"))) == 1  # la copie est laissée dans Downloads
