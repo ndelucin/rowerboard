@@ -200,6 +200,31 @@
     3,
     0
    ]
+  },
+  {
+   "id": "2026-10-28T16:28:20Z",
+   "date": "2026-10-28T16:28:20Z",
+   "file": "sessions/2026-10-28T162820Z.json",
+   "fcmaxAtSave": 180,
+   "overlapWarning": false,
+   "duration": 1322.626,
+   "distance": 5039.0,
+   "calories": 263.0,
+   "caloriesPolar": 198.0,
+   "avgWatts": 121.33,
+   "maxWatts": 1190.0,
+   "avgCadence": 17.27,
+   "avgHr": 137.53,
+   "maxHr": 155.0,
+   "avgPace500": 131.24,
+   "efficiency": 0.8822,
+   "zonePct": [
+    5,
+    8,
+    44,
+    43,
+    0
+   ]
   }
  ]
 }
