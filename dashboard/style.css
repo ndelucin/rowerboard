@@ -43,7 +43,9 @@ button.ghost:disabled { opacity: .35; cursor: default; }
 .fold summary h2 { margin: 0; }
 .fold[open] summary { margin-bottom: 14px; }
 .sub { color: var(--muted); font-size: 13px; flex: 1; text-align: right; }
-button.ghost { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 16px; }
+.top-links { display: flex; gap: 6px; }
+button.ghost, a.ghost { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 16px; }
+a.ghost { text-decoration: none; font-size: 13px; line-height: 1.5; white-space: nowrap; }
 main { padding-top: 20px; padding-bottom: 64px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -72,4 +74,4 @@ tbody tr.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .zone .bar i { display: block; height: 100%; border-radius: 6px; }
 .msg { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: var(--err-bg); color: var(--err-text); font-size: 14px; }
 .msg.warn { background: var(--warn-bg); color: var(--warn-text); }
-@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } .sub { display: none; } .top-in { justify-content: space-between; } }
+@media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } .sub { display: none; } .top-in { justify-content: space-between; align-items: center; gap: 8px; } .top-links { margin-left: auto; } }
