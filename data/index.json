@@ -225,6 +225,25 @@
     43,
     0
    ]
+  },
+  {
+   "id": "2026-11-01T15:01:27Z",
+   "date": "2026-11-01T15:01:27Z",
+   "file": "sessions/2026-11-01T150127Z.json",
+   "fcmaxAtSave": 180,
+   "overlapWarning": false,
+   "duration": 1199.968,
+   "distance": 4988.0,
+   "calories": 276.0,
+   "caloriesPolar": null,
+   "avgWatts": 158.18,
+   "maxWatts": 304.0,
+   "avgCadence": 23.4,
+   "avgHr": null,
+   "maxHr": null,
+   "avgPace500": 120.29,
+   "efficiency": null,
+   "zonePct": null
   }
  ]
 }
