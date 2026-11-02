@@ -118,7 +118,7 @@ Le lanceur retrouve le dépôt à partir de son propre emplacement : il n'y a pa
 - **Tests obligatoires** : rien n'est commité si les tests échouent, y compris à la relance d'un traitement interrompu. Sans `.venv`, les tests sont sautés avec un avertissement : créer le venv (voir [Lancer les tests](#lancer-les-tests)).
 - **Pas de doublon** : une séance est identifiée par son heure de début. Un fichier dont la séance est déjà rangée reste dans `~/Downloads`. Si seul le *nom* est déjà pris (par exemple `workout.tcx` d'une autre séance), le nouveau fichier est renommé avec son heure de début au lieu d'écraser l'ancien.
 - **Fichiers inexploitables** : un TCX non reconnu ou sans heure de début est ignoré et laissé dans `~/Downloads`, avec un avertissement. Il ne bloque pas les autres.
-- **Un seul export présent** : le script le signale et attend l'autre.
+- **Un seul export présent** : un Polar sans S4 est signalé (rien n'est fusionné). Un S4 sans Polar déclenche la question « 1 seul fichier détecté - normal ? Continuer sans FC (y/n) ? » : `y` fusionne la séance sans FC, `n` la laisse dans `input/` (redemandé au prochain lancement tant qu'elle n'est pas fusionnée).
 - **Push rattrapé** : si un push a échoué (réseau coupé), un commit reste local. À la prochaine exécution, même sans nouvelle séance, il est poussé.
 
 ##### En cas de problème
@@ -126,7 +126,8 @@ Le lanceur retrouve le dépôt à partir de son propre emplacement : il n'y a pa
 | Message ou symptôme | Que faire |
 |---|---|
 | `L'arbre git contient d'autres modifications…` | Commiter ou ranger les fichiers listés, puis relancer |
-| `Il manque l'export Polar` (ou WaterRower) | Exporter l'autre fichier dans `~/Downloads`, puis relancer : le premier est déjà rangé dans `input/` |
+| `1 seul fichier détecté … (y/n)` | Normal si la séance n'a pas été enregistrée par la montre : `y` pour continuer sans FC. Sinon `n`, exporter le Polar puis relancer |
+| `Il manque l'export WaterRower` | Exporter le fichier S4 dans `~/Downloads`, puis relancer : le Polar est déjà rangé dans `input/` |
 | `Les tests échouent, rien n'est commité` | Corriger la cause, puis relancer. Les TCX sont déjà dans `input/` et `data/` déjà régénéré : le script relance simplement les tests puis commite |
 | `TCX non reconnu ou sans heure de début` | Le fichier n'est pas un export S4 ou Polar valide : le réexporter |
 | `Déjà présent (même séance)` | Cette séance est déjà dans `input/` : rien à faire |
@@ -156,6 +157,7 @@ git add data && git commit -m "Nouvelle séance" && git push
 
 ```bash
 python3 scripts/merge_tcx.py --s4 fichier_s4.tcx --polar fichier_polar.tcx --fcmax 180
+# séance sans Polar : omettre --polar (FC absente)
 ```
 
 Relancer la fusion ne crée pas de doublon : une séance est identifiée par son heure de début.

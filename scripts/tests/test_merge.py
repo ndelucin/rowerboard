@@ -65,3 +65,13 @@ def test_invalid_xml(tmp_path):
     bad.write_text("<nope")
     with pytest.raises(ValueError):
         m.parse_s4(bad)
+
+
+def test_session_without_polar():
+    s4_path = next(S4.glob("*.[tT][cC][xX]"))
+    s = m.compute_session(m.parse_s4(s4_path), None, 180)
+    sm = s["summary"]
+    assert sm["avgHr"] is None and sm["maxHr"] is None and sm["zonePct"] is None
+    assert sm["efficiency"] is None and sm["caloriesPolar"] is None
+    assert s["overlapWarning"] is False
+    assert all(p["hr"] is None for p in s["series"])

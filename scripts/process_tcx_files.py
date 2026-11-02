@@ -95,6 +95,32 @@ def collect(downloads: Path, s4_dir: Path, polar_dir: Path, since_h: float, dry_
     return moved
 
 
+# --- Séances sans Polar ------------------------------------------------------
+
+def ask_yes_no(question: str) -> bool:
+    """Pose `question` dans le terminal ; False sans réponse possible (entrée non interactive) ou si autre chose que y/o."""
+    if not sys.stdin.isatty():
+        print(f"{question}(entrée non interactive : non)")
+        return False
+    return input(question).strip().lower() in ("y", "yes", "o", "oui")
+
+
+def s4_without_polar(s4_dir: Path, polar_dir: Path, data_dir: Path) -> list[Path]:
+    """S4 rangés sans Polar correspondant et pas encore fusionnés (une séance sans Polar déjà acceptée n'est plus redemandée)."""
+    unpaired: list[Path] = []
+    m.auto_pairs(s4_dir, polar_dir, unpaired=unpaired)
+    done = load_index(data_dir)
+    out = []
+    for p in unpaired:
+        try:
+            sid = m.parse_s4(p)["points"][0]["t"].strftime("%Y-%m-%dT%H:%M:%SZ")
+        except (ValueError, ET.ParseError, OSError):
+            continue  # fichier illisible : la fusion le signalera
+        if sid not in done:
+            out.append(p)
+    return out
+
+
 # --- Git --------------------------------------------------------------------
 
 def git(root: Path, *args: str) -> str:
@@ -164,7 +190,8 @@ def run_pytest(root: Path) -> None:
 
 # --- Orchestration ----------------------------------------------------------
 
-def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool, run_tests: bool = True) -> int:
+def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bool, run_tests: bool = True,
+            ask=ask_yes_no) -> int:
     """Enchaîne : vérif git propre → ramassage → fusion → rapport → tests → commit → push. Retourne le code de sortie."""
     s4_dir, polar_dir = root / "input" / "data" / "s4", root / "input" / "data" / "polar"
     data_dir = root / "data"
@@ -176,18 +203,29 @@ def process(root: Path, downloads: Path, since_h: float, dry_run: bool, push: bo
     elif other:
         raise ProcessError("L'arbre git contient d'autres modifications, commit ou range-les d'abord :\n  " + "\n  ".join(other))
 
-    # 2. Ramassage des TCX dans Downloads ; on signale s'il manque l'un des deux exports.
+    # 2. Ramassage des TCX dans Downloads. Un Polar sans S4 est signalé ; un S4 sans Polar sera confirmé (étape 3).
     moved = collect(downloads, s4_dir, polar_dir, since_h, dry_run)
-    if bool(moved["s4"]) != bool(moved["polar"]):
-        missing = "Polar" if moved["s4"] else "WaterRower (S4)"
-        print(f"! Il manque l'export {missing} : la séance ne sera fusionnée qu'une fois les deux présents.")
+    if moved["polar"] and not moved["s4"]:
+        print("! Il manque l'export WaterRower (S4) : la séance ne sera fusionnée qu'une fois les deux présents.")
     if dry_run:
+        if moved["s4"] and not moved["polar"]:
+            print("! Un seul fichier (S4) : une vraie exécution demanderait confirmation pour continuer sans FC.")
         print("Simulation : rien n'a été déplacé, fusionné ni poussé.")
         return 0
 
     # 3. Fusion S4 + Polar. Les séances « nouvelles » sont celles absentes du dernier commit.
+    #    Un S4 sans Polar n'est fusionné (sans FC) qu'après confirmation de l'utilisateur.
+    accepted = []
+    for p in s4_without_polar(s4_dir, polar_dir, data_dir):
+        if ask(f"1 seul fichier détecté ({p.name}, pas de Polar) - normal ? Continuer sans FC (y/n) ? "):
+            accepted.append(p)
+        else:
+            print(f"! {p.name} laissé dans input/ : relance après avoir exporté le Polar.")
+
     before = committed_index(root)
     rc = m.main(["--auto", "--s4-dir", str(s4_dir), "--polar-dir", str(polar_dir), "--out", str(data_dir)])
+    for p in accepted:
+        rc |= m.main(["--s4", str(p), "--out", str(data_dir)])
     if rc != 0:
         raise ProcessError("La fusion a échoué, rien n'est commité.")
 

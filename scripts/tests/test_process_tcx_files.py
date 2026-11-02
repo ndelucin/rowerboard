@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -84,12 +85,39 @@ def test_full_flow_commits_once_then_idempotent(repo):
     assert git(root, "log", "--oneline").count("\n") == 2
 
 
-def test_single_file_makes_no_commit(repo, capsys):
+def test_s4_alone_declined_makes_no_commit(repo, capsys):
     root, dl = repo
     (dl / "w.tcx").write_text(s4_tcx())
-    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False)
-    assert "Il manque l'export Polar" in capsys.readouterr().out
+    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False, ask=lambda q: False)
+    assert "laissé dans input/" in capsys.readouterr().out
     assert git(root, "log", "--oneline").count("\n") == 1
+    assert not list((root / "data" / "sessions").glob("*.json"))
+
+
+def test_s4_alone_accepted_merges_without_hr_then_not_asked_again(repo):
+    root, dl = repo
+    (dl / "w.tcx").write_text(s4_tcx())
+    questions = []
+    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False, ask=lambda q: questions.append(q) or True)
+    assert len(questions) == 1 and "1 seul fichier détecté" in questions[0]
+    assert git(root, "log", "--oneline").count("\n") == 2
+    entry = json.loads((root / "data" / "index.json").read_text())["sessions"][0]
+    assert entry["avgHr"] is None and entry["zonePct"] is None and entry["overlapWarning"] is False
+    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False, ask=lambda q: questions.append(q) or True)
+    assert len(questions) == 1  # déjà fusionnée : plus de question
+
+
+def test_dry_run_does_not_ask(repo):
+    root, dl = repo
+    (dl / "w.tcx").write_text(s4_tcx())
+    pt.process(root, dl, 24, dry_run=True, push=False, ask=lambda q: pytest.fail("ne doit pas demander"))
+
+
+def test_polar_alone_warns(repo, capsys):
+    root, dl = repo
+    (dl / "p.tcx").write_text(polar_tcx())
+    pt.process(root, dl, 24, dry_run=False, push=False, run_tests=False, ask=lambda q: pytest.fail("pas de question"))
+    assert "Il manque l'export WaterRower" in capsys.readouterr().out
 
 
 def test_refuses_when_other_files_are_modified(repo):

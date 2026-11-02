@@ -62,10 +62,10 @@ Les deux fichiers sont écrits ensemble et ne se modifient jamais à la main. To
 | Champ | Origine | Détail |
 |---|---|---|
 | `duration`, `distance`, `calories` | TCX S4 (totaux du tour) | secondes, mètres, kcal |
-| `caloriesPolar` | TCX Polar | kcal estimées par la montre |
+| `caloriesPolar` | TCX Polar | kcal estimées par la montre ; `null` sans fichier Polar |
 | `avgWatts`, `maxWatts` | moyenne et maximum des points S4 | `avgWatts` arrondi à 2 décimales |
 | `avgCadence` | moyenne des points S4 | 2 décimales |
-| `avgHr`, `maxHr` | points S4 ayant une FC | `null` s'il n'y en a aucune |
+| `avgHr`, `maxHr` | points S4 ayant une FC | `null` s'il n'y en a aucune (ex. séance sans fichier Polar) |
 | `avgPace500` | `duration / distance × 500` | s / 500 m ; le dashboard l'affiche au /2000 m (×4) |
 | `efficiency` | `avgWatts / avgHr` | 4 décimales |
 | `zonePct` | répartition des points avec FC | Z1 < 60 %, Z2 < 70 %, Z3 < 80 %, Z4 < 90 %, Z5 ≥ 90 % de `fcmaxAtSave` |
@@ -78,7 +78,7 @@ Les deux fichiers sont écrits ensemble et ne se modifient jamais à la main. To
 
 ### Champs de contrôle
 - `fcmaxAtSave` : FC max utilisée pour calculer `zonePct` au moment de la fusion (180 par défaut). Les zones ne sont pas recalculées si cette valeur change plus tard.
-- `overlapWarning` : `true` si le fichier Polar recouvre **moins de la moitié** de la durée de la séance. La FC moyenne et les zones sont alors peu fiables ; le script de traitement l'affiche (`FC partielle !`).
+- `overlapWarning` : `false` pour une séance sans fichier Polar (FC absente, `hr`/`avgHr`/`zonePct`/`efficiency` à `null`) ; sinon `true` si le fichier Polar recouvre **moins de la moitié** de la durée de la séance. La FC moyenne et les zones sont alors peu fiables ; le script de traitement l'affiche (`FC partielle !`).
 
 ### Valeurs absentes
 Une valeur absente ou invalide dans le TCX est `null` (jamais `0` ni chaîne vide). Le dashboard doit le tolérer partout.

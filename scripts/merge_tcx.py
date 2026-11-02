@@ -132,8 +132,9 @@ def _round(v, n=1):
     return None if v is None else round(v, n)
 
 
-def compute_session(s4: dict, polar: dict, fcmax: float) -> dict:
-    polar_pts = polar["points"]
+def compute_session(s4: dict, polar: dict | None, fcmax: float) -> dict:
+    """Fusionne S4 et Polar. `polar` est None pour une séance sans montre : FC absente (null) partout."""
+    polar_pts = polar["points"] if polar else []
     polar_ts = [p[0].timestamp() for p in polar_pts]
     start = s4["points"][0]["t"]
 
@@ -145,7 +146,7 @@ def compute_session(s4: dict, polar: dict, fcmax: float) -> dict:
             "cadence": p["cadence"],
             "watts": p["watts"],
             "strokeRate": p["strokeRate"],
-            "hr": nearest_hr(polar_pts, polar_ts, p["t"]),
+            "hr": nearest_hr(polar_pts, polar_ts, p["t"]) if polar else None,
         })
 
     watts = [s["watts"] for s in series if s["watts"] is not None]
@@ -167,8 +168,10 @@ def compute_session(s4: dict, polar: dict, fcmax: float) -> dict:
         zone_pct = [round(c / len(hrs) * 100) for c in counts]
 
     end = s4["points"][-1]["t"]
-    overlap = min(end, polar_pts[-1][0]) - max(start, polar_pts[0][0])
-    overlap_warning = overlap.total_seconds() < (duration or 0) * 0.5
+    overlap_warning = False  # sans fichier Polar, l'absence de FC est connue : pas d'avertissement
+    if polar:
+        overlap = min(end, polar_pts[-1][0]) - max(start, polar_pts[0][0])
+        overlap_warning = overlap.total_seconds() < (duration or 0) * 0.5
 
     date = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
@@ -180,7 +183,7 @@ def compute_session(s4: dict, polar: dict, fcmax: float) -> dict:
             "duration": duration,
             "distance": distance,
             "calories": s4["calories"],
-            "caloriesPolar": polar["calories"],
+            "caloriesPolar": polar["calories"] if polar else None,
             "avgWatts": _round(avg_watts, 2),
             "maxWatts": max(watts) if watts else None,
             "avgCadence": _round(_avg([s["cadence"] for s in series]), 2),
@@ -240,8 +243,11 @@ def _safe_start(path: Path):
         return None
 
 
-def auto_pairs(s4_dir: Path, polar_dir: Path, window_s: float = AUTO_PAIR_WINDOW_S):
-    """Apparie chaque fichier S4 au fichier Polar de début le plus proche (dans la fenêtre)."""
+def auto_pairs(s4_dir: Path, polar_dir: Path, window_s: float = AUTO_PAIR_WINDOW_S, unpaired: list | None = None):
+    """Apparie chaque fichier S4 au fichier Polar de début le plus proche (dans la fenêtre).
+
+    Les S4 sans Polar sont sautés ; s'il est fourni, `unpaired` reçoit leurs chemins (ex. pour demander confirmation).
+    """
     polars = [(p, t) for p in sorted(polar_dir.glob("*.[tT][cC][xX]")) if (t := _safe_start(p))]
     pairs, used = [], set()
     for s4 in sorted(s4_dir.glob("*.[tT][cC][xX]")):
@@ -251,7 +257,10 @@ def auto_pairs(s4_dir: Path, polar_dir: Path, window_s: float = AUTO_PAIR_WINDOW
         cands = [(abs((t - t0).total_seconds()), p) for p, t in polars if p not in used]
         cands = [c for c in cands if c[0] <= window_s]
         if not cands:
-            print(f"! Pas de fichier Polar pour {s4.name}", file=sys.stderr)
+            if unpaired is not None:
+                unpaired.append(s4)
+            else:
+                print(f"! Pas de fichier Polar pour {s4.name}", file=sys.stderr)
             continue
         _, best = min(cands, key=lambda c: c[0])
         used.add(best)
@@ -262,7 +271,7 @@ def auto_pairs(s4_dir: Path, polar_dir: Path, window_s: float = AUTO_PAIR_WINDOW
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--s4", type=Path, help="fichier TCX WaterRower S4")
-    ap.add_argument("--polar", type=Path, help="fichier TCX Polar")
+    ap.add_argument("--polar", type=Path, help="fichier TCX Polar (facultatif avec --s4)")
     ap.add_argument("--auto", action="store_true", help="apparie tous les fichiers des dossiers d'entrée")
     ap.add_argument("--s4-dir", type=Path, default=DEFAULT_S4_DIR)
     ap.add_argument("--polar-dir", type=Path, default=DEFAULT_POLAR_DIR)
@@ -272,22 +281,24 @@ def main(argv=None) -> int:
 
     if args.auto:
         pairs = auto_pairs(args.s4_dir, args.polar_dir)
-    elif args.s4 and args.polar:
-        pairs = [(args.s4, args.polar)]
+    elif args.s4:
+        pairs = [(args.s4, args.polar)]  # --polar facultatif : séance sans enregistrement de FC
     else:
-        ap.error("indiquer --s4 et --polar, ou --auto")
+        ap.error("indiquer --s4 (avec --polar si disponible), ou --auto")
 
     rc = 0
     for s4_path, polar_path in pairs:
         try:
-            session = compute_session(parse_s4(s4_path), parse_polar(polar_path), args.fcmax)
+            polar = parse_polar(polar_path) if polar_path else None
+            session = compute_session(parse_s4(s4_path), polar, args.fcmax)
         except ValueError as e:
             print(f"✗ {e}", file=sys.stderr)
             rc = 1  # on continue : une paire fautive ne doit pas bloquer les suivantes
             continue
         out = write_session(session, args.out)
         warn = " (chevauchement FC insuffisant !)" if session["overlapWarning"] else ""
-        print(f"✓ {s4_path.name} + {polar_path.name} → {out}{warn}")
+        label = f"{s4_path.name} + {polar_path.name}" if polar_path else f"{s4_path.name} (sans Polar)"
+        print(f"✓ {label} → {out}{warn}")
     return rc
 
 
