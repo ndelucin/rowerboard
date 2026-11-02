@@ -32,8 +32,9 @@ def test_session_1509_reference_values():
 
 @needs_input
 def test_auto_pairs_match_by_date():
-    pairs = m.auto_pairs(S4, POLAR)
-    assert len(pairs) == len(list(S4.glob("*.[tT][cC][xX]")))  # chaque S4 a trouvé son Polar
+    unpaired = []
+    pairs = m.auto_pairs(S4, POLAR, unpaired=unpaired)
+    assert len(pairs) + len(unpaired) == len(list(S4.glob("*.[tT][cC][xX]")))  # aucun S4 perdu (certains sans Polar)
     for s4, polar in pairs:
         assert s4.name[:10] in polar.name
 
